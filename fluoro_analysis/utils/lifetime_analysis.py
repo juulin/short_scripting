@@ -7,7 +7,76 @@ import pandas as pd
 from skimage import measure
 
 
-def extract_lifetime_data(lifetime_image, binary_mask, cell_labels):
+def convert_raw_to_nanoseconds(lifetime_image):
+    """
+    Convert raw lifetime values from Leica LASX FLIM format to nanoseconds.
+    
+    The Leica LASX software exports lifetimes as 16-bit values (0-65535) 
+    scaled to represent a 0-10 ns range. We divide by 65535/10 = 6553.5 
+    to get the actual lifetime values in nanoseconds.
+    
+    Args:
+        lifetime_image (ndarray): Raw lifetime image from TIFF stack
+        
+    Returns:
+        ndarray: Lifetime image in nanoseconds (0-10 ns range)
+    """
+    # Convert to float to avoid integer division issues
+    lifetime_ns = np.array(lifetime_image, dtype=float)
+    
+    # Convert from raw 16-bit values (0-65535) to nanoseconds (0-10)
+    lifetime_ns /= 6553.5
+    
+    print(f"Converted lifetime values to nanoseconds: min={np.min(lifetime_ns):.3f}ns, max={np.max(lifetime_ns):.3f}ns")
+    return lifetime_ns
+
+
+def calculate_median_arrival_time(lifetime_histogram, time_values):
+    """
+    Calculate the median photon arrival time for a TCSPC histogram.
+    
+    This implements a more accurate approach for median calculation:
+    1. Computes the cumulative distribution function (CDF)
+    2. Finds the exact time point where CDF = 0.5 (median)
+    3. Uses linear interpolation for sub-bin precision
+    
+    Args:
+        lifetime_histogram (ndarray): Histogram of photon arrival times
+        time_values (ndarray): Time values for each bin in nanoseconds
+        
+    Returns:
+        float: Median arrival time in nanoseconds
+    """
+    if np.sum(lifetime_histogram) == 0:
+        return 0.0
+    
+    # Calculate cumulative distribution
+    cdf = np.cumsum(lifetime_histogram) / np.sum(lifetime_histogram)
+    
+    # Find bins where cdf crosses 0.5
+    median_bin = np.searchsorted(cdf, 0.5)
+    
+    # Safety check
+    if median_bin == 0:
+        return time_values[0]
+    elif median_bin >= len(cdf):
+        return time_values[-1]
+    
+    # Linear interpolation for more precise median
+    # Find adjacent time points and CDF values
+    t0, t1 = time_values[median_bin-1], time_values[median_bin]
+    cdf0, cdf1 = cdf[median_bin-1], cdf[median_bin]
+    
+    # Interpolate to find exact time where CDF = 0.5
+    if cdf1 == cdf0:  # Avoid division by zero
+        median_time = t0
+    else:
+        median_time = t0 + (0.5 - cdf0) * (t1 - t0) / (cdf1 - cdf0)
+    
+    return median_time
+
+
+def extract_lifetime_data(lifetime_image, binary_mask, cell_labels, convert_to_ns=True):
     """
     Extract lifetime data for each segmented cell.
     
@@ -15,10 +84,15 @@ def extract_lifetime_data(lifetime_image, binary_mask, cell_labels):
         lifetime_image (ndarray): 2D image with lifetime values
         binary_mask (ndarray): Binary mask of segmented cells
         cell_labels (ndarray): Labeled image where each cell has unique integer ID
+        convert_to_ns (bool): Whether to convert raw values to nanoseconds
         
     Returns:
         dict: Dictionary containing lifetime statistics for each cell
     """
+    # Convert raw lifetime values to nanoseconds if needed
+    if convert_to_ns:
+        lifetime_image = convert_raw_to_nanoseconds(lifetime_image)
+    
     # Get properties of each labeled region
     regions = measure.regionprops(cell_labels, intensity_image=lifetime_image)
     
@@ -63,19 +137,28 @@ def extract_lifetime_data(lifetime_image, binary_mask, cell_labels):
         all_lifetimes.extend(cell_lifetimes)
     
     # Calculate overall statistics
-    overall_stats = {
-        'overall_median_lifetime': np.median(all_lifetimes),
-        'overall_mean_lifetime': np.mean(all_lifetimes),
-        'overall_std_lifetime': np.std(all_lifetimes),
-        'cell_count': len(cell_data),
-        'total_area_pixels': np.sum(binary_mask),
-    }
+    if all_lifetimes:
+        overall_stats = {
+            'overall_median_lifetime': np.median(all_lifetimes),
+            'overall_mean_lifetime': np.mean(all_lifetimes),
+            'overall_std_lifetime': np.std(all_lifetimes),
+            'cell_count': len(cell_data),
+            'total_area_pixels': np.sum(binary_mask),
+        }
+    else:
+        overall_stats = {
+            'overall_median_lifetime': 0,
+            'overall_mean_lifetime': 0,
+            'overall_std_lifetime': 0,
+            'cell_count': 0,
+            'total_area_pixels': 0,
+        }
     
     # Add overall stats to the results
     cell_data['overall'] = overall_stats
     
     print(f"Extracted lifetime data for {len(cell_data) - 1} cells")
-    print(f"Overall median lifetime: {overall_stats['overall_median_lifetime']:.4f}")
+    print(f"Overall median lifetime: {overall_stats['overall_median_lifetime']:.4f} ns")
     
     return cell_data
 

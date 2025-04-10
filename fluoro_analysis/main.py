@@ -61,8 +61,12 @@ def main():
     print(f"Processing file: {args.input_file}")
     print(f"Using {args.threshold} thresholding method")
     
+    # Get input filename without extension to use as output subfolder name
+    input_filename = Path(args.input_file).stem
+    output_folder = os.path.join(args.output, input_filename)
+    
     # Create output directory if it doesn't exist
-    os.makedirs(args.output, exist_ok=True)
+    os.makedirs(output_folder, exist_ok=True)
     
     # Load the TIFF stack
     intensity_channel, lifetime_channel = load_tiff_stack(args.input_file)
@@ -78,7 +82,7 @@ def main():
     lifetime_data = extract_lifetime_data(lifetime_channel, segmented_cells, cell_labels)
     
     # Save results to Excel
-    excel_path = export_to_excel(lifetime_data, output_dir=args.output)
+    excel_path = export_to_excel(lifetime_data, output_dir=output_folder)
     print(f"Results saved to: {excel_path}")
     
     # Visualize results if requested
@@ -89,7 +93,7 @@ def main():
             segmented_cells,
             cell_labels,
             threshold_value,
-            output_dir=args.output
+            output_dir=output_folder
         )
         print(f"Visualizations saved to: {vis_path}")
 
