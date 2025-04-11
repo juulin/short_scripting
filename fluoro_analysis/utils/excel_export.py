@@ -19,11 +19,12 @@ def export_to_excel(cell_data, output_dir='.'):
     Returns:
         str: Path to the saved Excel file
     """
-    # Ensure output directory exists
-    os.makedirs(output_dir, exist_ok=True)
+    # Create a dedicated subfolder for Excel data
+    excel_dir = os.path.join(output_dir, 'excel_data')
+    os.makedirs(excel_dir, exist_ok=True)
     
     # Create Excel writer
-    output_path = os.path.join(output_dir, 'lifetime_analysis_results.xlsx')
+    output_path = os.path.join(excel_dir, 'lifetime_analysis_results.xlsx')
     excel_writer = pd.ExcelWriter(output_path, engine='openpyxl')
     
     # Extract overall stats
@@ -93,11 +94,12 @@ def export_time_series_to_excel(time_series_data, output_dir='.'):
     Returns:
         str: Path to the saved Excel file
     """
-    # Ensure output directory exists
-    os.makedirs(output_dir, exist_ok=True)
+    # Create a dedicated subfolder for Excel data
+    excel_dir = os.path.join(output_dir, 'excel_data')
+    os.makedirs(excel_dir, exist_ok=True)
     
     # Create Excel writer
-    output_path = os.path.join(output_dir, 'time_series_lifetime_analysis.xlsx')
+    output_path = os.path.join(excel_dir, 'time_series_lifetime_analysis.xlsx')
     excel_writer = pd.ExcelWriter(output_path, engine='openpyxl')
     
     # Create summary sheet with one row per cell
@@ -126,7 +128,32 @@ def export_time_series_to_excel(time_series_data, output_dir='.'):
     # Write summary to Excel
     df_summary.to_excel(excel_writer, sheet_name='Summary', index=False)
     
-    # Create per-cell time series sheets
+    # Create all-in-one timepoint data sheet
+    all_timepoint_rows = []
+    for cell_id, data in time_series_data.items():
+        for i, time_point in enumerate(data['time_points']):
+            row = {
+                'Cell ID': cell_id,
+                'Time Point': time_point,
+                'Median Lifetime': data['median_lifetime'][i],
+                'Mean Lifetime': data['mean_lifetime'][i],
+                'Std Lifetime': data['std_lifetime'][i],
+                'Area (pixels)': data['area_pixels'][i],
+                'Centroid X': data['centroid_x'][i] if 'centroid_x' in data else None,
+                'Centroid Y': data['centroid_y'][i] if 'centroid_y' in data else None
+            }
+            all_timepoint_rows.append(row)
+    
+    # Create all-timepoints DataFrame
+    df_all_timepoints = pd.DataFrame(all_timepoint_rows)
+    
+    if not df_all_timepoints.empty:
+        df_all_timepoints = df_all_timepoints.sort_values(['Time Point', 'Cell ID'])
+    
+    # Write all timepoints data to Excel
+    df_all_timepoints.to_excel(excel_writer, sheet_name='All Timepoints', index=False)
+    
+    # Also keep the per-cell time series sheets for reference
     for cell_id, data in time_series_data.items():
         # Create DataFrame for this cell's time series
         df_cell = pd.DataFrame({
