@@ -108,10 +108,11 @@ def track_cells_over_time(labeled_cells_sequence):
         current_props = measure.regionprops(current_frame)
         
         # Get centroids of previous frame cells
-        prev_centroids = {
-            cell_id: tracking_data[cell_id][t-1][1] 
-            for cell_id in tracking_data
-        }
+        prev_centroids = {}
+        for cell_id in tracking_data:
+            # Check if the cell was tracked in the previous frame
+            if t-1 in tracking_data[cell_id]:
+                prev_centroids[cell_id] = tracking_data[cell_id][t-1][1]
         
         # Get centroids of current frame cells
         current_centroids = {

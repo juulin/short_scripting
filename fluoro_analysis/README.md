@@ -27,7 +27,7 @@ pip install -r requirements.txt
 To analyze a single TIFF stack with intensity and lifetime channels:
 
 ```bash
-python main.py path/to/your/tiff_stack.tif --threshold otsu --visualize
+py main.py path/to/your/tiff_stack.tif --threshold otsu --visualize
 ```
 
 ### Time Series Analysis
@@ -35,7 +35,7 @@ python main.py path/to/your/tiff_stack.tif --threshold otsu --visualize
 To analyze a TIFF stack with a time series of intensity and lifetime channels:
 
 ```bash
-python time_series.py path/to/your/time_series_tiff_stack.tif --threshold otsu --visualize
+py time_series.py path/to/your/time_series_tiff_stack.tif --threshold otsu --visualize
 ```
 
 ### Command-line Arguments

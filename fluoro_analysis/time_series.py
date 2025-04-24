@@ -60,9 +60,13 @@ def main():
     
     print(f"Processing time series file: {args.input_file}")
     print(f"Using {args.threshold} thresholding method")
+        
+    # Get input filename without extension to use as output subfolder name
+    input_filename = Path(args.input_file).stem
+    output_folder = os.path.join(args.output, input_filename)
     
     # Create output directory if it doesn't exist
-    os.makedirs(args.output, exist_ok=True)
+    os.makedirs(output_folder, exist_ok=True)
     
     # Load the TIFF stack with time series
     intensity_time_series, lifetime_time_series = load_time_series_tiff_stack(args.input_file)
